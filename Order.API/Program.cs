@@ -1,4 +1,9 @@
 using MassTransit;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Order.API.Models.Contexts;
+using Order.API.ViewModels;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
@@ -9,12 +14,37 @@ builder.Services.AddMassTransit(configurator =>
         _configure.Host(builder.Configuration["RabbitMQ"]);
     });
 });
+builder.Services.AddDbContext<OrdeAPIDbContext>(cfg =>
+{
+    cfg.UseSqlServer(builder.Configuration.GetConnectionString("SQLServer"));
+});
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
+
+app.MapPost("/create-order", async (CreateOrderVM model, OrdeAPIDbContext context) =>
+{
+    Order.API.Models.Order order = new()
+    {
+        BuyerId = Guid.TryParse(model.BuyerId, out Guid _buyerId) ? _buyerId : Guid.NewGuid(),
+        OrderItems = model.OrderItems.Select(oi => new Order.API.Models.OrderItem()
+        {
+            Count = oi.Count,
+            Price = oi.Price,
+            ProductId = Guid.Parse(oi.ProductId)
+        }).ToList(),
+        OrderStatus = Order.API.Enums.OrderStatus.Suspend,
+        CreatedDate = DateTime.UtcNow,
+        TotalPrice = model.OrderItems.Sum(oi => oi.Price * oi.Count)
+    };
+
+    await context.Orders.AddAsync(order);
+    await context.SaveChangesAsync();
+});
 
 app.Run();
 
