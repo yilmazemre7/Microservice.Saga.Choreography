@@ -1,9 +1,9 @@
 using MassTransit;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Order.API.Models.Contexts;
 using Order.API.ViewModels;
 using Scalar.AspNetCore;
+using Shared.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
@@ -26,7 +26,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.MapPost("/create-order", async (CreateOrderVM model, OrdeAPIDbContext context) =>
+app.MapPost("/create-order", async (CreateOrderVM model, OrdeAPIDbContext context, IPublishEndpoint publishEndpoint) =>
 {
     Order.API.Models.Order order = new()
     {
@@ -44,6 +44,19 @@ app.MapPost("/create-order", async (CreateOrderVM model, OrdeAPIDbContext contex
 
     await context.Orders.AddAsync(order);
     await context.SaveChangesAsync();
+    OrderCreatedEvent orderCreatedEvent = new()
+    {
+        BuyerId = order.BuyerId,
+        OrderId = order.Id,
+        TotalPrice = order.TotalPrice,
+        OrderItems = order.OrderItems.Select(oi => new Shared.Messages.OrderItemMessage()
+        {
+            Count = oi.Count,
+            Price = oi.Price,
+            ProductId = oi.ProductId
+        }).ToList(),
+    };
+    await publishEndpoint.Publish(orderCreatedEvent);
 });
 
 app.Run();
