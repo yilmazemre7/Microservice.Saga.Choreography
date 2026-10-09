@@ -17,7 +17,7 @@ namespace Order.API.Consumers
                 await _context.SaveChangesAsync();
             }
             {
-
+                throw new Exception("Order can't be found");
             }
             throw new NotImplementedException();
         }
