@@ -26,17 +26,17 @@ namespace Stock.API.Consumers
                     var stock = await (await collection.FindAsync(s => s.ProductId == orderItem.ProductId)).FirstOrDefaultAsync();
                     stock.Count -= orderItem.Count;
                     await collection.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId, stock);
-                    var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri($"queue:{RabbitMQSettings.Payment_StockReservedEvent}"));
-                    StockReservedEvent stockReservedEvent = new StockReservedEvent()
-                    {
-                        BuyerId = context.Message.BuyerId,
-                        OrderId = context.Message.OrderId,
-                        TotalPrice = context.Message.TotalPrice,
-                        OrderItems = context.Message.OrderItems
-                    };
-                    await sendEndpoint.Send(stockReservedEvent);
-
                 }
+
+                var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri($"queue:{RabbitMQSettings.Payment_StockReservedEvent}"));
+                StockReservedEvent stockReservedEvent = new StockReservedEvent()
+                {
+                    BuyerId = context.Message.BuyerId,
+                    OrderId = context.Message.OrderId,
+                    TotalPrice = context.Message.TotalPrice,
+                    OrderItems = context.Message.OrderItems
+                };
+                await sendEndpoint.Send(stockReservedEvent);
             }
             else
             {
@@ -47,7 +47,8 @@ namespace Stock.API.Consumers
                     Message = "Insufficient stock"
                 };
 
-                await sendEndpointProvider.Send(stockNotReservedEvent);
+                var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri($"queue:{RabbitMQSettings.Order_StockNotReservedEvent}"));
+                await sendEndpoint.Send(stockNotReservedEvent);
 
             }
         }
