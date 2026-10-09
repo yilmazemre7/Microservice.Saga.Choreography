@@ -1,21 +1,21 @@
 # Microservice.Saga.Choreography
 
-**Choreography tabanlı Saga Pattern** ile dağıtık transaction yönetimini gösteren örnek bir .NET 9 mikroservis projesi.
+A .NET 9 microservices sample demonstrating distributed transaction management with the **Choreography-based Saga pattern**.
 
-Merkezi bir orkestratör yoktur; her servis yalnızca ilgilendiği event'leri dinler, kendi işini yapar ve sonucunu yeni bir event olarak yayınlar. Bir adım başarısız olduğunda önceki adımlar **compensating (telafi edici) işlemlerle** geri alınır.
+There is no central orchestrator. Each service listens only to the events it cares about, does its own work, and publishes the result as a new event. When a step fails, earlier steps are rolled back through **compensating actions**.
 
-## Mimari
+## Architecture
 
-| Servis | Sorumluluk | Veritabanı | Port (http / https) |
+| Service | Responsibility | Database | Port (http / https) |
 |---|---|---|---|
-| **Order.API** | Siparişi oluşturur, saga'yı başlatır, sipariş durumunu günceller | SQL Server (EF Core) | `5258` / `7144` |
-| **Stock.API** | Stok kontrolü ve rezervasyonu, ödeme hatasında stoğu iade eder | MongoDB | `5198` / `7011` |
-| **Payment.API** | Ödemeyi işler, sonucu event olarak yayınlar | — | `5065` / `7149` |
-| **Shared** | Event/mesaj sözleşmeleri ve kuyruk isimleri | — | — |
+| **Order.API** | Creates the order, starts the saga, updates the order status | SQL Server (EF Core) | `5258` / `7144` |
+| **Stock.API** | Checks and reserves stock, restores stock when payment fails | MongoDB | `5198` / `7011` |
+| **Payment.API** | Processes the payment and publishes the result as an event | — | `5065` / `7149` |
+| **Shared** | Event/message contracts and queue names | — | — |
 
-Servisler arası iletişim **RabbitMQ** üzerinden **MassTransit** ile sağlanır.
+Services communicate through **RabbitMQ** using **MassTransit**.
 
-## Saga Akışı
+## Saga Flow
 
 ```mermaid
 sequenceDiagram
@@ -26,30 +26,30 @@ sequenceDiagram
     participant P as Payment.API
 
     C->>O: POST /create-order
-    O->>O: Order kaydet (Status = Suspend)
+    O->>O: Save order (Status = Suspend)
     O-)S: OrderCreatedEvent
 
-    alt Stok yeterli
-        S->>S: Stoktan düş
+    alt Stock available
+        S->>S: Decrease stock
         S-)P: StockReservedEvent
-        alt Ödeme başarılı
+        alt Payment succeeds
             P-)O: PaymentCompletedEvent
             O->>O: Status = Completed
-        else Ödeme başarısız
+        else Payment fails
             P-)O: PaymentFailedEvent
             O->>O: Status = Fail
             P-)S: PaymentFailedEvent
-            S->>S: Stoğu iade et (compensation)
+            S->>S: Restore stock (compensation)
         end
-    else Stok yetersiz
+    else Insufficient stock
         S-)O: StockNotReservedEvent
         O->>O: Status = Fail
     end
 ```
 
-### Event'ler
+### Events
 
-| Event | Yayınlayan | Dinleyen | Kuyruk |
+| Event | Published by | Consumed by | Queue |
 |---|---|---|---|
 | `OrderCreatedEvent` | Order.API | Stock.API | `stock-order-created-event-queue` |
 | `StockReservedEvent` | Stock.API | Payment.API | `payment-stock-reserved-event-queue` |
@@ -57,21 +57,21 @@ sequenceDiagram
 | `PaymentCompletedEvent` | Payment.API | Order.API | `payment-completed-event-queue` |
 | `PaymentFailedEvent` | Payment.API | Order.API, Stock.API | `order-payment-failed-event-queue`, `stock-payment-failed-event-queue` |
 
-Kuyruk isimleri [Shared/RabbitMQSettings.cs](Shared/RabbitMQSettings.cs) içinde tanımlıdır.
+Queue names are defined in [Shared/RabbitMQSettings.cs](Shared/RabbitMQSettings.cs).
 
-### Sipariş Durumları
+### Order Statuses
 
-`OrderStatus` enum'u: `Suspend` (işlemde) → `Completed` (başarılı) veya `Fail` (stok/ödeme hatası).
+The `OrderStatus` enum: `Suspend` (in progress) → `Completed` (success) or `Fail` (stock/payment failure).
 
-## Teknolojiler
+## Tech Stack
 
 - .NET 9 / ASP.NET Core Minimal API
 - MassTransit 9 + RabbitMQ
 - Entity Framework Core 9 + SQL Server
 - MongoDB.Driver 3
-- Scalar (OpenAPI arayüzü)
+- Scalar (OpenAPI UI)
 
-## Proje Yapısı
+## Project Structure
 
 ```
 Microservice.Saga.Choreography/
@@ -81,7 +81,7 @@ Microservice.Saga.Choreography/
 │   ├── Migrations/
 │   ├── Models/           # Order, OrderItem, OrderAPIDbContext
 │   ├── ViewModels/       # CreateOrderVM, CreateOrderItemVM
-│   └── Program.cs        # /create-order endpoint + MassTransit ayarları
+│   └── Program.cs        # /create-order endpoint + MassTransit setup
 ├── Stock.API/
 │   ├── Consumers/        # OrderCreated, PaymentFailed (compensation)
 │   ├── Models/           # Stock
@@ -91,33 +91,33 @@ Microservice.Saga.Choreography/
 │   ├── Consumers/        # StockReserved
 │   └── Program.cs
 └── Shared/
-    ├── Events/           # Saga event sözleşmeleri
+    ├── Events/           # Saga event contracts
     ├── Messages/         # OrderItemMessage
     └── RabbitMQSettings.cs
 ```
 
-## Kurulum
+## Getting Started
 
-### Gereksinimler
+### Prerequisites
 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - SQL Server
 - MongoDB
-- RabbitMQ (lokal veya CloudAMQP gibi bir servis)
+- RabbitMQ (local or a hosted service such as CloudAMQP)
 
-Altyapıyı Docker ile hızlıca ayağa kaldırmak için:
+To spin up the infrastructure quickly with Docker:
 
 ```bash
 docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
 ```
 
 ```bash
-docker run -d --name mongodb -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=<sifre> mongo
+docker run -d --name mongodb -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=<password> mongo
 ```
 
-### Yapılandırma
+### Configuration
 
-Her servisin `appsettings.json` dosyasına aşağıdaki ayarları ekleyin:
+Add the following settings to each service's `appsettings.json`:
 
 **Order.API**
 
@@ -135,7 +135,7 @@ Her servisin `appsettings.json` dosyasına aşağıdaki ayarları ekleyin:
 ```json
 {
   "ConnectionStrings": {
-    "MongoDB": "mongodb://admin:<sifre>@localhost:27017/?authSource=admin"
+    "MongoDB": "mongodb://admin:<password>@localhost:27017/?authSource=admin"
   },
   "RabbitMQ": "amqp://guest:guest@localhost:5672"
 }
@@ -149,17 +149,17 @@ Her servisin `appsettings.json` dosyasına aşağıdaki ayarları ekleyin:
 }
 ```
 
-> `appsettings.json` dosyaları kimlik bilgisi içerdiği için repoya eklenmemelidir.
+> `appsettings.json` files contain credentials and should not be committed to the repository.
 
-### Veritabanı
+### Database
 
-Order.API için migration'ı uygulayın:
+Apply the Order.API migration:
 
 ```bash
 dotnet ef database update --project Order.API
 ```
 
-Stock.API, `StockDB` veritabanındaki `stock` koleksiyonunu kullanır. Test için örnek stok kaydı ekleyin (mongosh):
+Stock.API uses the `stock` collection in the `StockDB` database. Insert a sample stock record for testing (mongosh):
 
 ```js
 use StockDB
@@ -171,9 +171,9 @@ db.stock.insertOne({
 })
 ```
 
-### Çalıştırma
+### Running
 
-Üç servisi ayrı terminallerde başlatın (veya Visual Studio'da *Multiple startup projects* seçin):
+Start the three services in separate terminals (or use *Multiple startup projects* in Visual Studio):
 
 ```bash
 dotnet run --project Order.API
@@ -187,11 +187,11 @@ dotnet run --project Stock.API
 dotnet run --project Payment.API
 ```
 
-## Kullanım
+## Usage
 
-Development ortamında Order.API'nin Scalar arayüzü: `http://localhost:5258/scalar`
+In the Development environment, the Order.API Scalar UI is available at `http://localhost:5258/scalar`.
 
-Örnek sipariş isteği:
+Sample order request:
 
 ```http
 POST http://localhost:5258/create-order
@@ -209,9 +209,9 @@ Content-Type: application/json
 }
 ```
 
-Sipariş önce `Suspend` durumunda kaydedilir; saga tamamlandığında `Orders` tablosundaki `OrderStatus` alanı `Completed` veya `Fail` olarak güncellenir.
+The order is first saved with the `Suspend` status. When the saga finishes, the `OrderStatus` column in the `Orders` table is updated to `Completed` or `Fail`.
 
-## Notlar
+## Notes
 
-- **Payment.API** şu an ödemeyi her zaman başarılı kabul eder (`if (true)`). Hata/compensation akışını denemek için [StockReservedEventConsumer.cs](Payment.API/Consumers/StockReservedEventConsumer.cs) içindeki koşulu değiştirin.
-- Proje eğitim amaçlıdır; outbox/inbox, idempotency ve retry politikaları gibi üretim gereksinimleri kapsam dışıdır.
+- **Payment.API** currently always treats payment as successful (`if (true)`). To try the failure/compensation flow, change the condition in [StockReservedEventConsumer.cs](Payment.API/Consumers/StockReservedEventConsumer.cs).
+- This project is for educational purposes; production concerns such as outbox/inbox, idempotency, and retry policies are out of scope.
