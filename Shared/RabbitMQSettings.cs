@@ -4,5 +4,6 @@
     {
         public const string Stock_OrderCreatedEvent = "stock-order-created-event-queue";
         public const string Payment_StockReservedEvent = "payment-stock-reserved-event-queue";
+        public const string Order_PaymentCompletedEvent = "payment-completed-event-queue";
     }
 }
