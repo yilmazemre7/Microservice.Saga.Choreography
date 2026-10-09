@@ -12,16 +12,24 @@ builder.Services.AddOpenApi();
 builder.Services.AddMassTransit(configurator =>
 {
     configurator.AddConsumer<PaymentCompletedEventConsumer>();
-    configurator.UsingRabbitMq((context, _configure) =>
+    configurator.AddConsumer<PaymentFailedEventConsumer>();
+
+    configurator.UsingRabbitMq((context, cfg) =>
     {
-        _configure.Host(builder.Configuration["RabbitMQ"]);
-        _configure.ReceiveEndpoint(RabbitMQSettings.Order_PaymentCompletedEvent, e =>
+        cfg.Host(builder.Configuration["RabbitMQ"]);
+
+        cfg.ReceiveEndpoint(RabbitMQSettings.Order_PaymentCompletedEvent, e =>
         {
             e.ConfigureConsumer<PaymentCompletedEventConsumer>(context);
         });
+
+        cfg.ReceiveEndpoint(RabbitMQSettings.Order_PaymentFailedEvent, e =>
+        {
+            e.ConfigureConsumer<PaymentFailedEventConsumer>(context);
+        });
     });
 });
-builder.Services.AddDbContext<OrdeAPIDbContext>(cfg =>
+builder.Services.AddDbContext<OrderAPIDbContext>(cfg =>
 {
     cfg.UseSqlServer(builder.Configuration.GetConnectionString("SQLServer"));
 });
@@ -33,7 +41,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.MapPost("/create-order", async (CreateOrderVM model, OrdeAPIDbContext context, IPublishEndpoint publishEndpoint) =>
+app.MapPost("/create-order", async (CreateOrderVM model, OrderAPIDbContext context, IPublishEndpoint publishEndpoint) =>
 {
     Order.API.Models.Order order = new()
     {

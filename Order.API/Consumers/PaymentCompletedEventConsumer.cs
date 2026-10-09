@@ -5,21 +5,17 @@ using Shared.Events;
 
 namespace Order.API.Consumers
 {
-    public class PaymentCompletedEventConsumer(OrdeAPIDbContext _context) : IConsumer<PaymentCompletedEvent>
+    public class PaymentCompletedEventConsumer(OrderAPIDbContext _context) : IConsumer<PaymentCompletedEvent>
     {
         public async Task Consume(ConsumeContext<PaymentCompletedEvent> context)
         {
             var order = await _context.Orders
                 .FirstOrDefaultAsync(s => s.Id == context.Message.OrderId);
-            if (order != null)
-            {
-                order.OrderStatus = Enums.OrderStatus.Completed;
-                await _context.SaveChangesAsync();
-            }
-            {
-                throw new Exception("Order can't be found");
-            }
-            throw new NotImplementedException();
+            if (order is null)
+                throw new NullReferenceException();
+            order.OrderStatus = Enums.OrderStatus.Completed;
+            await _context.SaveChangesAsync();
+
         }
     }
 }

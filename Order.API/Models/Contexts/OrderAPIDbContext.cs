@@ -2,13 +2,13 @@
 
 namespace Order.API.Models.Contexts
 {
-    public class OrdeAPIDbContext :DbContext
+    public class OrderAPIDbContext :DbContext
     {
-        public OrdeAPIDbContext(DbContextOptions options) : base(options)
+        public OrderAPIDbContext(DbContextOptions options) : base(options)
         {
         }
 
-        protected OrdeAPIDbContext()
+        protected OrderAPIDbContext()
         {
         }
 
