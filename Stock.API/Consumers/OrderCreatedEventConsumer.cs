@@ -1,11 +1,13 @@
 ﻿using MassTransit;
 using MongoDB.Driver;
+using Shared;
 using Shared.Events;
 using Stock.API.Services;
 
 namespace Stock.API.Consumers
 {
-    public class OrderCreatedEventConsumer(MongoDBService mongoDbService) : IConsumer<OrderCreatedEvent>
+    public class OrderCreatedEventConsumer(MongoDBService mongoDbService
+        , ISendEndpointProvider sendEndpointProvider) : IConsumer<OrderCreatedEvent>
     {
         public async Task Consume(ConsumeContext<OrderCreatedEvent> context)
         {
@@ -23,14 +25,30 @@ namespace Stock.API.Consumers
                 {
                     var stock = await (await collection.FindAsync(s => s.ProductId == orderItem.ProductId)).FirstOrDefaultAsync();
                     stock.Count -= orderItem.Count;
-
                     await collection.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId, stock);
+                    var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri($"queue:{RabbitMQSettings.Payment_StockReservedEvent}"));
+                    StockReservedEvent stockReservedEvent = new StockReservedEvent()
+                    {
+                        BuyerId = context.Message.BuyerId,
+                        OrderId = context.Message.OrderId,
+                        TotalPrice = context.Message.TotalPrice,
+                        OrderItems = context.Message.OrderItems
+                    };
+                    await sendEndpoint.Send(stockReservedEvent);
+
                 }
             }
             else
             {
-                //stok işlemi başarısız
-                // orderı uyaracak event fırlatılacaktır.
+                StockNotReservedEvent stockNotReservedEvent = new StockNotReservedEvent()
+                {
+                    BuyerId = context.Message.BuyerId,
+                    OrderId = context.Message.OrderId,
+                    Message = "Insufficient stock"
+                };
+
+                await sendEndpointProvider.Send(stockNotReservedEvent);
+
             }
         }
     }
