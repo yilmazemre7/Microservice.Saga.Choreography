@@ -159,16 +159,11 @@ Apply the Order.API migration:
 dotnet ef database update --project Order.API
 ```
 
-Stock.API uses the `stock` collection in the `StockDB` database. Insert a sample stock record for testing (mongosh):
+Stock.API uses the `stock` collection in the `StockDB` database. On startup, if the collection is empty, it is seeded automatically with five stock records (random `ProductId`s, with counts 100, 200, 50, 30 and 5). Look up the generated product IDs to use in order requests (mongosh):
 
 ```js
 use StockDB
-db.stock.insertOne({
-  _id: UUID(),
-  ProductId: UUID("11111111-1111-1111-1111-111111111111"),
-  Count: 100,
-  CreatedDate: new Date()
-})
+db.stock.find()
 ```
 
 ### Running
@@ -191,7 +186,7 @@ dotnet run --project Payment.API
 
 In the Development environment, the Order.API Scalar UI is available at `http://localhost:5258/scalar`.
 
-Sample order request:
+Sample order request (use a `ProductId` from the seeded stock records):
 
 ```http
 POST http://localhost:5258/create-order
@@ -201,7 +196,7 @@ Content-Type: application/json
   "buyerId": "22222222-2222-2222-2222-222222222222",
   "orderItems": [
     {
-      "productId": "11111111-1111-1111-1111-111111111111",
+      "productId": "<ProductId from the stock collection>",
       "count": 2,
       "price": 150.00
     }
