@@ -14,12 +14,12 @@ namespace Stock.API.Consumers
             foreach (var orderItem in context.Message.OrderItems)
             {
                 var stock = await (await stocks.FindAsync(s => s.ProductId ==
-                    orderItem.ProductId)).FirstOrDefaultAsync();
+                    orderItem.ProductId.ToString())).FirstOrDefaultAsync();
                 if (stock is not null)
                 {
                     stock.Count += orderItem.Count;
                 }
-                await stocks.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId, stock);
+                await stocks.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId.ToString(), stock);
             }
         }
     }

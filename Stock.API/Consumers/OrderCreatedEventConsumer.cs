@@ -15,7 +15,7 @@ namespace Stock.API.Consumers
             IMongoCollection<Models.Stock> collection = mongoDbService.GetCollection<Models.Stock>();
             foreach (var orderItem in context.Message.OrderItems)
             {
-                stockResult.Add(await (await collection.FindAsync(s => s.ProductId == orderItem.ProductId
+                stockResult.Add(await (await collection.FindAsync(s => s.ProductId == orderItem.ProductId.ToString()
                 && s.Count >= orderItem.Count)).AnyAsync());
             }
 
@@ -23,9 +23,9 @@ namespace Stock.API.Consumers
             {
                 foreach (var orderItem in context.Message.OrderItems)
                 {
-                    var stock = await (await collection.FindAsync(s => s.ProductId == orderItem.ProductId)).FirstOrDefaultAsync();
+                    var stock = await (await collection.FindAsync(s => s.ProductId == orderItem.ProductId.ToString())).FirstOrDefaultAsync();
                     stock.Count -= orderItem.Count;
-                    await collection.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId, stock);
+                    await collection.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId.ToString(), stock);
                 }
 
                 var sendEndpoint = await sendEndpointProvider.GetSendEndpoint(new Uri($"queue:{RabbitMQSettings.Payment_StockReservedEvent}"));

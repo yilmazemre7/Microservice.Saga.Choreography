@@ -10,9 +10,8 @@ namespace Stock.API.Models
         [BsonElement(Order = 0)]
         public Guid Id { get; set; }
 
-        [BsonGuidRepresentation(GuidRepresentation.Standard)]
         [BsonElement(Order = 1)]
-        public Guid ProductId { get; set; }
+        public string ProductId { get; set; }
 
         [BsonElement(Order = 2)]
         public int Count { get; set; }

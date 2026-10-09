@@ -33,11 +33,11 @@ MongoDBService mongoDBService = scope.ServiceProvider.GetRequiredService<MongoDB
 var stockCollection = mongoDBService.GetCollection<Stock.API.Models.Stock>();
 if (!stockCollection.FindSync(session => true).Any())
 {
-    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid(), Count = 100, CreatedDate = DateTime.UtcNow });
-    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid(), Count = 200, CreatedDate = DateTime.UtcNow });
-    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid(), Count = 50, CreatedDate = DateTime.UtcNow });
-    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid(), Count = 30, CreatedDate = DateTime.UtcNow });
-    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid(), Count = 5, CreatedDate = DateTime.UtcNow });
+    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid().ToString(), Count = 100, CreatedDate = DateTime.UtcNow });
+    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid().ToString(), Count = 200, CreatedDate = DateTime.UtcNow });
+    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid().ToString(), Count = 50, CreatedDate = DateTime.UtcNow });
+    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid().ToString(), Count = 30, CreatedDate = DateTime.UtcNow });
+    await stockCollection.InsertOneAsync(new() { ProductId = Guid.NewGuid().ToString(), Count = 5, CreatedDate = DateTime.UtcNow });
 }
 
 app.Run();
