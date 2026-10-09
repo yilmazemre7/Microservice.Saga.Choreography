@@ -79,6 +79,8 @@ app.MapPost("/create-order", async (CreateOrderVM model, OrderAPIDbContext conte
         }).ToList(),
     };
     await publishEndpoint.Publish(orderCreatedEvent);
+
+    return Results.Ok(new { OrderId = order.Id });
 });
 
 app.Run();

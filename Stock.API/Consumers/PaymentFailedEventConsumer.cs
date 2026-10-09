@@ -18,8 +18,8 @@ namespace Stock.API.Consumers
                 if (stock is not null)
                 {
                     stock.Count += orderItem.Count;
+                    await stocks.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId.ToString(), stock);
                 }
-                await stocks.FindOneAndReplaceAsync(s => s.ProductId == orderItem.ProductId.ToString(), stock);
             }
         }
     }
